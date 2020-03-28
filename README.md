@@ -28,7 +28,7 @@ Coming soon
 * Now copy the files to the ESP32
 
 ```
-for i in boot.py main.py networks.json master_config.json; do
+for i in boot.py main.py networks.json master_config.json lib/mqtt.py; do
   ampy -p /dev/ttyUSB0 -b 115200 put $i /$i
 done
 ampy reset
