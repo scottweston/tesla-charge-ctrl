@@ -11,9 +11,9 @@ early in the morning before the sun comes up to recharge the Powerwall.
 ## HARDWARE
 
 *  ESP32 based board, e.g. one of:
-  * [LoPY4](https://pycom.io/product/lopy4/)
-  * [Huzzah32](https://www.adafruit.com/product/3405)
-  * [TinyPCIO](https://www.tinypico.com/buy)
+    * [LoPY4](https://pycom.io/product/lopy4/)
+    * [Huzzah32](https://www.adafruit.com/product/3405)
+    * [TinyPCIO](https://www.tinypico.com/buy)
 * [RS485 transceiver](https://www.sparkfun.com/products/10124)
 
 ## Wiring
