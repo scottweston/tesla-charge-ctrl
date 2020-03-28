@@ -1,0 +1,9 @@
+{
+  "TWCID": "7777",
+  "BUSID": "dd",
+  "DEBUG": 3,
+  "TOPIC": "charger/%s",
+  "TOPIC_MASTER": "tesla/charger/master",
+  "TOPIC_SLAVE": "tesla/charger/%s",
+  "MQTT_SERVER": "192.168.1.50"
+}
