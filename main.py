@@ -14,22 +14,6 @@ from machine import WDT
 
 from mqtt import MQTTClient
 
-if os.uname().sysname == "LoPy4":
-    import pyco
-    HARDWARE='pycom'
-    SERIAL=1
-    RTS='P8'
-    LED='P9'
-elif os.uname().sysname == "esp32":
-    import esp32
-    HARDWARE='esp32'
-    SERIAL=2
-    RTS=15
-    LED=13
-else:
-    print('unsupported hardware detected')
-    raise
-
 # -----------------------------------------------------------------------------
 
 class InvalidMessage(Exception):
@@ -247,13 +231,66 @@ def sub_cb(topic, msg):
 def feedWdt(a):
     wdt.feed()
 
-def rgbled(c):
+def rgbled(r, g, b):
     if HARDWARE=='pycom':
-        pycom.rgbled(0xFF0000)
+        pycom.rgbled(hex(r << 16 | g << 8 | b))
+    elif BOARD=='tinypico':
+        dotstar[0] = (r, g, b, 1)
     else:
         pass
 
+def showactivity():
+    global activity
+
+    if BOARD=='tinypico':
+        dotstar[0] = (0xff, 0xff, 0xff, 1)
+    else:
+        if activity == 0:
+            activity = 1
+        else:
+            activity = 0
+        actled.value(activity)
+
 # -----------------------------------------------------------------------------
+
+if os.uname().sysname == "LoPy4":
+    import pyco
+    HARDWARE='pycom'
+    BOARD='pycom'
+    RTS='P8'
+    actled = Pin(13, mode=Pin.OUT)
+    actled.value(1)
+    hpwc = UART(1, baudrate=9600)
+    hpwc.init(9600, bits=8, parity=None, stop=1, pins=('P3', 'P4', 'P8', None))
+elif os.uname().sysname == "esp32":
+    import esp32
+    HARDWARE='esp32'
+    RTS=15
+    if os.uname().machine == "ESP32 module with ESP32":
+        debug('BOARD: Generic ESP32')
+        BOARD='generic'
+        actled = Pin(13, mode=Pin.OUT)
+        actled.value(1)
+        hpwc = UART(2, baudrate=9600)
+        hpwc.init(9600, bits=8, parity=None, stop=1)
+    elif os.uname().machine == "TinyPICO with ESP32-PICO-D4":
+        debug('BOARD: TinyPICO', 1)
+        BOARD='tinypico'
+        from machine import SPI
+        import tinypico as TinyPICO
+        from dotstar import DotStar
+        spi = SPI(sck=Pin(TinyPICO.DOTSTAR_CLK),
+                mosi=Pin(TinyPICO.DOTSTAR_DATA),
+                miso=Pin(TinyPICO.SPI_MISO))
+        dotstar = DotStar(spi, 1, brightness = 0.5)
+        TinyPICO.set_dotstar_power(True)
+        hpwc = UART(1, baudrate=9600, tx=33, rx=32)
+    else:
+        print('unsupported hardware detected')
+        raise
+else:
+    print('unsupported hardware detected')
+    raise
 
 if HARDWARE=='pycom':
     pycom.heartbeat(False)
@@ -261,12 +298,9 @@ if HARDWARE=='pycom':
 elif HARDWARE=='esp32':
     wlan = WLAN(network.STA_IF)
 
-actled = Pin(LED, mode=Pin.OUT)
-actled.value(1)
-
 activity = 0
 
-rgbled(0x000F00)
+rgbled(0x00, 0x0F, 0x00)
 
 # some basic unit tests
 test_msg = b'\xc0\xfd\xe0\x02\x2d\x77\x77\x01\x03\x20\x02\xdb\xdd\x00\x00\xfe\xc0'
@@ -306,15 +340,10 @@ except:
     debug('unable to connect to mqtt, reseting to reconnect to wifi', 1)
     machine.reset()
 
-debug("Setting up UART", 1)
-hpwc = UART(SERIAL, baudrate=9600)
-# Pins: TX, RX, RTS, CTS
-# hpwc.init(9600, bits=8, parity=None, stop=1, pins=('P3', 'P4', 'P8', None))
-hpwc.init(9600, bits=8, parity=None, stop=1)
-
 # Announce ourselves as the master and give slaves a chance to
 # change id before talking to us
 
+debug("Announcing master to slaves", 1)
 for _ in range(0, 5):
     send_master_linkready1()
     time.sleep(.1)
@@ -341,7 +370,7 @@ try:
         except ZeroDivisionError:
             led = 0x00
         led += 0x10
-        rgbled((led << 16) & (led << 8) & led)
+        rgbled(led, led, led)
 
         try:
             any = hpwc.any()
@@ -355,7 +384,7 @@ try:
             machine.reset()
 
         if any:
-            rgbled(0x00003F)
+            rgbled(0x00, 0x00, 0x3F)
             incomingMsg = hpwc.read()
             try:
                 slaveMsg = bytearray()
@@ -413,18 +442,18 @@ try:
                     ourSlave['ampsActual'] = ampsActual
                     debug("slave: ampsMax=%2.2f, ampsActual=%2.2f" % (ourSlave['ampsMax'], ourSlave['ampsActual']), 1)
                 else:
-                    rgbled(0xFF0000)
+                    rgbled(0xFF, 0x00, 0x00)
                     debug("recv: unknown message type %d:%d" % (slaveMsg[0], slaveMsg[1]), 1)
             except InvalidMessage as e:
-                rgbled(0xFF0000)
+                rgbled(0xFF, 0x00, 0x00)
                 debug("slave message failed checks: %s" % e, 0)
             except ValueError as e:
-                rgbled(0xFF0000)
+                rgbled(0xFF, 0x00, 0x00)
                 debug("recv: garbled message: %s" % e, 0)
                 ERRORS += 1
 
         if (time.time() > PING):
-            rgbled(0x0F0F00)
+            rgbled(0x0F, 0x0F, 0x00)
             try:
                 mqtt_client.ping()
             except:
@@ -436,13 +465,7 @@ try:
         # If we have a slave talk to it every second
         if (time.time() >= HEARTBEAT):
             HEARTBEAT = time.time() + 1
-            rgbled(0x0F000F)
-
-            if activity == 0:
-                activity = 1
-            else:
-                activity = 0
-            actled.value(activity)
+            rgbled(0x0F, 0x00, 0x0F)
 
             debug("mem_free: %d" % gc.mem_free(), 1)
             if (ourSlave['twcid'] != None):
@@ -464,7 +487,7 @@ try:
                 debug("no mqtt messages waiting", 2)
 
         if (ERRORS > 10):
-            rgbled(0xFF0000)
+            rgbled(0xFF, 0x00, 0x00)
             try:
                 mqtt_client.publish(topic=TOPIC_MASTER, msg="soft_reset")
             except:
@@ -482,7 +505,7 @@ except KeyboardInterrupt:
         t = Timer(-1)
         t.init(period=2000, mode=Timer.PERIODIC, callback=feedWdt)
 except Exception as e:
-    rgbled(0xFF0000)
+    rgbled(0xFF, 0x00, 0x00)
     debug("uncaught exception: %s" % e, 0)
     time.sleep(1)
     # machine.reset()
