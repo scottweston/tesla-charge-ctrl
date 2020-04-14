@@ -267,7 +267,7 @@ elif os.uname().sysname == "esp32":
     HARDWARE='esp32'
     RTS=15
     if os.uname().machine == "ESP32 module with ESP32":
-        debug('BOARD: Generic ESP32')
+        debug('BOARD: Generic ESP32', 1)
         BOARD='generic'
         actled = Pin(13, mode=Pin.OUT)
         actled.value(1)
@@ -457,7 +457,7 @@ try:
             try:
                 mqtt_client.ping()
             except:
-                debug("mqtt ping failure")
+                debug("mqtt ping failure", 0)
                 time.sleep(1)
                 machine.reset()
             PING = time.time() + 30
